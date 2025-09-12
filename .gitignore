@@ -1,0 +1,41 @@
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Hardhat
+cache/
+artifacts/
+
+# Environment (secrets)
+.env
+.env.local
+
+# Keys (private only, public can be tracked if needed)
+keys/private.pem
+
+# TypeChain
+typechain/
+typechain-types/
+
+# Solidity coverage
+coverage/
+coverage.json
+
+# Hardhat Ignition deployments
+ignition/deployments/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Build / dist
+dist/
+build/
