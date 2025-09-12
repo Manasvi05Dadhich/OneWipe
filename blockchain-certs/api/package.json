@@ -1,5 +1,5 @@
 {
-  "name": "blockchain-certs",
+  "name": "api",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -13,14 +13,6 @@
   "dependencies": {
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
     "express": "^5.1.0"
-  },
-  "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.2.3",
-    "chai": "^6.0.1",
-    "ethers": "^5.7.2",
-    "hardhat": "^2.22.12",
-    "mocha": "^11.7.2"
   }
 }
