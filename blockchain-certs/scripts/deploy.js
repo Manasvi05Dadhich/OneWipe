@@ -1,6 +1,6 @@
-// scripts/deploy.js
-const fs = require("fs");
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
@@ -10,18 +10,28 @@ async function main() {
   const registry = await Registry.deploy();
   await registry.deployed();
 
-  console.log("Deployed to:", registry.address);
+  console.log("WipeCertificateRegistry deployed to:", registry.address);
 
-  // Save address + ABI
-  const data = {
+  // Save address + ABI to deployed/contract.json
+  const deployedDir = path.join(__dirname, "../deployed");
+  if (!fs.existsSync(deployedDir)) {
+    fs.mkdirSync(deployedDir);
+  }
+
+  const contractData = {
     address: registry.address,
-    abi: JSON.parse(registry.interface.format("json"))
+    abi: JSON.parse(registry.interface.format("json")),
   };
-  fs.writeFileSync("./deployed/contract.json", JSON.stringify(data, null, 2));
-  console.log("Saved to deployed/contract.json");
+
+  fs.writeFileSync(
+    path.join(deployedDir, "contract.json"),
+    JSON.stringify(contractData, null, 2)
+  );
+
+  console.log("Contract details saved to deployed/contract.json");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
 });
