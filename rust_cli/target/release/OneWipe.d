@@ -1,1 +1,1 @@
-D:\rust_cli\target\release\OneWipe.exe: D:\rust_cli\src\main.rs
+E:\OneWipe\rust_cli\target\release\OneWipe.exe: E:\OneWipe\rust_cli\src\main.rs
