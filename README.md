@@ -1,3 +1,4 @@
+HEAD
 # Secure Wipe - Flutter UI (frontend-app)
 
 This is the frontend (UI only). It must be integrated with the native wipe engine (Rust) and backend certificate service.
@@ -21,3 +22,6 @@ Important integration points:
 Notes:
 - This UI intentionally does not implement destructive operations locally. The native engine performs wipes; Flutter communicates via channels.
 - When integrating, ensure the native responses match the JSON schema used by DeviceModel and the certificate model.
+=======
+"# OneWipe" 
+>>>>>>> 949af9b126679ae2ab10385673ee8fee4937137f

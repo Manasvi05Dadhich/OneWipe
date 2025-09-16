@@ -1,0 +1,98 @@
+{
+  "address": "0x5DFb8441a0735D303e38BCf294e4157e0485FE3e",
+  "abi": [
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "CertificateStored",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "certID",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "certHash",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "timestamp",
+          "indexed": false
+        },
+        {
+          "type": "address",
+          "name": "issuer",
+          "indexed": true
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getCertificate",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "certID"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "certHash"
+        },
+        {
+          "type": "uint256",
+          "name": "timestamp"
+        },
+        {
+          "type": "address",
+          "name": "issuer"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "storeCertificate",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "certID"
+        },
+        {
+          "type": "string",
+          "name": "certHash"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "verifyCertificate",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "certID"
+        },
+        {
+          "type": "string",
+          "name": "certHash"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "bool"
+        }
+      ]
+    }
+  ]
+}
