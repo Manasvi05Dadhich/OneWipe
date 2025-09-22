@@ -1,12 +1,14 @@
 // api/index.js
+require("dotenv").config();   // ✅ Load .env variables
+
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 const QRCode = require("qrcode");
 const PDFDocument = require("pdfkit");
+const { ethers } = require("ethers");
 
 const signing = require("./signing");
 const { logAction } = require("./audit");
@@ -30,12 +32,33 @@ if (fs.existsSync(TXS_JSON_PATH)) {
   txLog = JSON.parse(fs.readFileSync(TXS_JSON_PATH, "utf8"));
 }
 
+// ✅ Fixed getRegistry: always parse ABI safely and log ENV
 async function getRegistry() {
-  const Registry = await hre.ethers.getContractFactory("WipeCertificateRegistry");
-  return Registry.attach(contractData.address);
+  console.log("DEBUG PRIVATE_KEY length:", process.env.PRIVATE_KEY ? process.env.PRIVATE_KEY.length : "undefined");
+  console.log("DEBUG PRIVATE_KEY raw:", JSON.stringify(process.env.PRIVATE_KEY));
+  console.log("DEBUG RPC URL:", process.env.AMOY_RPC_URL);
+
+  const provider = new ethers.providers.JsonRpcProvider(process.env.AMOY_RPC_URL);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+  let abi = contractData.abi;
+  if (typeof abi === "string") {
+    try {
+      abi = JSON.parse(abi);
+    } catch (err) {
+      console.error("❌ Failed to parse ABI string:", err.message);
+      throw err;
+    }
+  }
+
+  return new ethers.Contract(contractData.address, abi, wallet);
 }
 
-// ---------------- SIGN & ANCHOR ----------------
+
+// Track uptime
+const startTime = Date.now();
+
+/* ---------------- SIGN & ANCHOR ---------------- */
 app.post("/signAndAnchor", async (req, res) => {
   try {
     const { certID, certJSON } = req.body;
@@ -44,25 +67,44 @@ app.post("/signAndAnchor", async (req, res) => {
     }
 
     const canonicalString = JSON.stringify(
-      Object.keys(certJSON).sort().reduce((o, k) => { o[k] = certJSON[k]; return o; }, {})
+      Object.keys(certJSON).sort().reduce((o, k) => {
+        o[k] = certJSON[k];
+        return o;
+      }, {})
     );
 
     const signatureBase64 = signing.signString(canonicalString);
     const signedBlob = canonicalString + "||" + signatureBase64;
     const certHashHex = signing.sha256Hex(signedBlob);
-
     const registry = await getRegistry();
-    const tx = await registry.storeCertificate(certID, certHashHex);
-    const receipt = await tx.wait();
 
-    txLog[certID] = { txHash: receipt.transactionHash, certHash: certHashHex, signatureBase64 };
+// ⛽ force gasLimit + log tx hash
+    const tx = await registry.storeCertificate(certID, certHashHex, { gasLimit: 500000 });
+    console.log("📤 TX submitted:", tx.hash);
+
+    const receipt = await tx.wait();
+    console.log("✅ TX mined in block:", receipt.blockNumber, "hash:", receipt.transactionHash);
+
+
+    txLog[certID] = {
+      txHash: receipt.transactionHash,
+      certHash: certHashHex,
+      signatureBase64,
+      certJSON,
+    };
     fs.writeFileSync(TXS_JSON_PATH, JSON.stringify(txLog, null, 2));
 
     logAction("signAndAnchor", `certID=${certID} txHash=${receipt.transactionHash}`);
 
     return res.json({
       success: true,
-      data: { certID, certHashHex, signatureBase64, txHash: receipt.transactionHash },
+      data: {
+        certID,
+        certHashHex,
+        signatureBase64,
+        txHash: receipt.transactionHash,
+        polygonscan: `https://amoy.polygonscan.com/tx/${receipt.transactionHash}`
+      },
     });
   } catch (err) {
     console.error("❌ signAndAnchor error:", err);
@@ -70,7 +112,7 @@ app.post("/signAndAnchor", async (req, res) => {
   }
 });
 
-// ---------------- VERIFY FULL ----------------
+/* ---------------- VERIFY FULL ---------------- */
 app.post("/verifyFull", async (req, res) => {
   try {
     const { certID, certJSON, signatureBase64 } = req.body;
@@ -79,7 +121,10 @@ app.post("/verifyFull", async (req, res) => {
     }
 
     const canonicalString = JSON.stringify(
-      Object.keys(certJSON).sort().reduce((o, k) => { o[k] = certJSON[k]; return o; }, {})
+      Object.keys(certJSON).sort().reduce((o, k) => {
+        o[k] = certJSON[k];
+        return o;
+      }, {})
     );
 
     const sigOk = signing.verifySignature(canonicalString, signatureBase64);
@@ -94,6 +139,28 @@ app.post("/verifyFull", async (req, res) => {
     const registry = await getRegistry();
     const anchored = await registry.verifyCertificate(certID, certHashHex);
 
+    // ✅ Auto-heal txLog
+    if (!txLog[certID] || !txLog[certID].certJSON) {
+      txLog[certID] = {
+        ...(txLog[certID] || {}),
+        certHash: certHashHex,
+        signatureBase64,
+        certJSON,
+      };
+
+      try {
+        const certOnChain = await registry.getCertificate(certID);
+        if (certOnChain && certOnChain[0]) {
+          txLog[certID].txHash = txLog[certID].txHash || null;
+        }
+      } catch (e) {
+        console.warn("⚠️ Could not fetch txHash for auto-heal:", e.message);
+      }
+
+      fs.writeFileSync(TXS_JSON_PATH, JSON.stringify(txLog, null, 2));
+      logAction("verifyFull", `certID=${certID} retroactively updated txLog`);
+    }
+
     logAction("verifyFull", `certID=${certID} signatureOk=${sigOk} anchored=${anchored}`);
 
     return res.json({ success: true, data: { validSignature: true, anchored } });
@@ -103,7 +170,7 @@ app.post("/verifyFull", async (req, res) => {
   }
 });
 
-// ---------------- GET CERT ----------------
+/* ---------------- GET CERT ---------------- */
 app.get("/getCert/:id", async (req, res) => {
   try {
     const certID = req.params.id;
@@ -138,7 +205,7 @@ app.get("/getCert/:id", async (req, res) => {
   }
 });
 
-// ---------------- QRCODE ----------------
+/* ---------------- QRCODE ---------------- */
 app.get("/qrcode/:id", async (req, res) => {
   try {
     const certID = req.params.id;
@@ -164,7 +231,7 @@ app.get("/qrcode/:id", async (req, res) => {
   }
 });
 
-// ---------------- GENERATE PDF ----------------
+/* ---------------- GENERATE PDF ---------------- */
 app.post("/generatePdf", async (req, res) => {
   try {
     const { certID, certJSON, signatureBase64 } = req.body;
@@ -172,7 +239,6 @@ app.post("/generatePdf", async (req, res) => {
       return res.status(400).json({ success: false, error: "certID required" });
     }
 
-    // Auto fetch from logs if missing
     let finalJSON = certJSON;
     let finalSig = signatureBase64;
     if (!finalJSON || !finalSig) {
@@ -257,7 +323,7 @@ app.post("/generatePdf", async (req, res) => {
   }
 });
 
-// ---------------- STATS ----------------
+/* ---------------- STATS ---------------- */
 app.get("/stats", async (req, res) => {
   try {
     const registry = await getRegistry();
@@ -265,23 +331,42 @@ app.get("/stats", async (req, res) => {
     const totalCertificates = certIDs.length;
 
     let lastIssued = null;
-    let issuers = new Set();
+    let issuers = new Map();
+    let devices = new Map();
 
     for (let certID of certIDs) {
+      let issuer = "Unknown";
+      let tsNum = 0;
+      let device = "Unknown";
+
       try {
         const cert = await registry.getCertificate(certID);
-        if (cert[0]) {
-          issuers.add(cert[2]);
-          const tsNum = Number(cert[1]);
-          const tsDate = new Date(tsNum * 1000).toISOString();
-          if (!lastIssued || tsDate > lastIssued) {
-            lastIssued = tsDate;
-          }
+        if (cert && cert[0]) {
+          issuer = cert[2];
+          tsNum = Number(cert[1]);
+        }
+
+        if (txLog[certID] && txLog[certID].certJSON) {
+          device = txLog[certID].certJSON.device || "Unknown";
         }
       } catch (e) {
-        console.warn("⚠️ Failed fetching cert:", certID, e.message);
+        console.warn("⚠️ Blockchain lookup failed:", certID);
+        tsNum = Math.floor(Date.now() / 1000);
+      }
+
+      issuers.set(issuer, (issuers.get(issuer) || 0) + 1);
+      devices.set(device, (devices.get(device) || 0) + 1);
+
+      if (tsNum > 0) {
+        const tsDate = new Date(tsNum * 1000).toISOString();
+        if (!lastIssued || tsDate > lastIssued) {
+          lastIssued = tsDate;
+        }
       }
     }
+
+    const issuerStats = Object.fromEntries(issuers);
+    const deviceStats = Object.fromEntries(devices);
 
     res.json({
       success: true,
@@ -290,6 +375,10 @@ app.get("/stats", async (req, res) => {
         uniqueIssuers: issuers.size,
         lastIssued: lastIssued || "N/A",
         lastUpdatedAt: new Date().toISOString(),
+        issuers: issuerStats,
+        devices: deviceStats,
+        topIssuer: [...issuers.entries()].sort((a, b) => b[1] - a[1])[0] || null,
+        topDevice: [...devices.entries()].sort((a, b) => b[1] - a[1])[0] || null,
       },
     });
   } catch (err) {
@@ -298,13 +387,26 @@ app.get("/stats", async (req, res) => {
   }
 });
 
-// ---------------- HEALTH ----------------
-app.get("/health", (req, res) => {
+/* ---------------- HEALTH ---------------- */
+app.get("/health", async (req, res) => {
+  const uptimeSec = Math.floor((Date.now() - startTime) / 1000);
+
+  let contractReachable = false;
+  try {
+    const registry = await getRegistry();
+    await registry.getCertificate("nonexistent");
+    contractReachable = true;
+  } catch {
+    contractReachable = false;
+  }
+
   res.json({
     status: "ok",
+    uptimeSec,
     server: "http://localhost:4000",
     network: process.env.AMOY_RPC_URL ? "amoy" : "localhost",
     contractAddress: contractData.address,
+    contractReachable,
     abiVersion: signing.sha256Hex(JSON.stringify(contractData.abi)).slice(0, 12),
   });
 });
