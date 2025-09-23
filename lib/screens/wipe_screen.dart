@@ -46,7 +46,7 @@ class _WipeScreenState extends State<WipeScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: const TopNavBar(currentRoute: '/dashboard'),
       body: ResponsiveLayout(
         mobile: _buildMobileLayout(theme),
@@ -142,28 +142,30 @@ class _WipeScreenState extends State<WipeScreen> {
   }
 
   Widget _buildStatsRow(ThemeData theme, {bool isMobile = false}) {
-    final stats = [
-      _statCard("Devices Wiped", "1,247", "This month", Icons.devices,
-          accentGreen, theme),
-      _statCard("Success Rate", "99.9%", "Verified complete", Icons.verified,
-          accentPurple, theme),
-      _statCard("Active Wipes", "3", "In progress", Icons.autorenew, accentBlue,
-          theme),
-    ];
-
-    return isMobile
-        ? Column(
-            children: stats
-                .map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: s,
-                    ))
-                .toList(),
-          )
-        : Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: stats,
-          );
+    if (isMobile) {
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _statCardMobile("Devices Wiped", "1,247", "This month", Icons.devices, accentGreen, theme),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _statCardMobile("Success Rate", "99.9%", "Verified complete", Icons.verified, accentPurple, theme),
+          ),
+          _statCardMobile("Active Wipes", "3", "In progress", Icons.autorenew, accentBlue, theme),
+        ],
+      );
+    } else {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _statCard("Devices Wiped", "1,247", "This month", Icons.devices, accentGreen, theme),
+          _statCard("Success Rate", "99.9%", "Verified complete", Icons.verified, accentPurple, theme),
+          _statCard("Active Wipes", "3", "In progress", Icons.autorenew, accentBlue, theme),
+        ],
+      );
+    }
   }
 
   Widget _buildActionRow({bool isMobile = false}) {
@@ -265,6 +267,60 @@ class _WipeScreenState extends State<WipeScreen> {
             Text(subtext, style: theme.textTheme.bodySmall),
           ],
         ),
+      ),
+    );
+  }
+
+  // --- Mobile Stat Card (without Expanded) ---
+  Widget _statCardMobile(String title, String value, String subtext, IconData icon,
+      Color color, ThemeData theme) {
+    return Container(
+      height: 130,
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.4),
+            blurRadius: 20,
+            spreadRadius: -5,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title, style: theme.textTheme.bodySmall),
+              ),
+            ],
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(subtext, style: theme.textTheme.bodySmall),
+        ],
       ),
     );
   }
@@ -413,7 +469,6 @@ class ConnectedDevicesSection extends StatelessWidget {
         ],
       ),
     );
-
   }
 }
 

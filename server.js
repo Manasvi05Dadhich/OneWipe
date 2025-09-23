@@ -12,11 +12,13 @@ app.use(express.json());
 const wipeRoutes = require('./routes/wipe');
 const certRoutes = require('./routes/cert');
 const deviceRoutes = require('./routes/device');
+const blockchainRoutes = require('./routes/blockchain'); // ✅ NEW
 
 // 5. Use the Routes
 app.use('/api/wipe', wipeRoutes);
 app.use('/api/certificate', certRoutes);
 app.use('/api/device', deviceRoutes);
+app.use('/api/blockchain', blockchainRoutes); // ✅ NEW
 
 // A simple status check endpoint
 app.get('/api/status', (req, res) => {

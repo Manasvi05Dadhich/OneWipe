@@ -13,7 +13,7 @@ class OfflineScreen extends StatelessWidget {
     final isMobile = width < 800;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: const TopNavBar(currentRoute: '/offline'),
       body: ResponsiveLayout(
         mobile: _buildContent(context, theme, isMobile: true),
@@ -119,7 +119,6 @@ class OfflineScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-
         _buildCard(
           theme,
           title: "Download SecureWipe Pro ISO",
@@ -128,7 +127,8 @@ class OfflineScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("File Size: 450 MB", style: theme.textTheme.bodyMedium),
-              Text("Platform: x86_64 / UEFI", style: theme.textTheme.bodyMedium),
+              Text("Platform: x86_64 / UEFI",
+                  style: theme.textTheme.bodyMedium),
               const SizedBox(height: 15),
               ElevatedButton.icon(
                 onPressed: () {},
@@ -145,7 +145,6 @@ class OfflineScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-
         _buildCard(
           theme,
           title: "Step-by-Step Guide",
@@ -245,9 +244,7 @@ class OfflineScreen extends StatelessWidget {
 
   // CARD
   Widget _buildCard(ThemeData theme,
-      {required String title,
-      required IconData icon,
-      required Widget child}) {
+      {required String title, required IconData icon, required Widget child}) {
     return Card(
       color: theme.cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -288,8 +285,9 @@ class OfflineScreen extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: selected ? theme.colorScheme.primary : Colors.grey, width: 1),
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.2),
+            color: selected ? theme.colorScheme.primary : Colors.grey,
+            width: 1),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.2),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -316,9 +314,7 @@ class OfflineScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 10, color: Colors.white)),
                 ),
               Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
                 color: selected ? theme.colorScheme.primary : Colors.grey,
               ),
             ],
@@ -334,8 +330,8 @@ class OfflineScreen extends StatelessWidget {
                       label: Text(tag,
                           style: theme.textTheme.bodySmall
                               ?.copyWith(fontSize: 10)),
-                      backgroundColor:
-                          theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest
+                          .withOpacity(0.3),
                     ))
                 .toList(),
           ),
@@ -379,8 +375,8 @@ class OfflineScreen extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(name,
-          style: theme.textTheme.bodyLarge
-              ?.copyWith(fontWeight: FontWeight.bold)),
+          style:
+              theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
       subtitle: Text(os, style: theme.textTheme.bodySmall),
       trailing: Icon(Icons.open_in_new, color: theme.colorScheme.primary),
     );

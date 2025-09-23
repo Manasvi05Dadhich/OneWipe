@@ -3,7 +3,7 @@ import 'screens/wipe_screen.dart';
 import 'screens/verify_screen.dart';
 import 'screens/offline_screen.dart';
 import 'screens/settings_screen.dart';
-import '../widgets/responsive_layout.dart';
+import 'screens/demo_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -74,6 +74,7 @@ class _MyAppState extends State<MyApp> {
         '/verify': (context) => const VerifyScreen(),
         '/offline': (context) => const OfflineScreen(),
         '/settings': (context) => const SettingsScreen(),
+        '/demo': (context) => const DemoScreen(),
       },
     );
   }

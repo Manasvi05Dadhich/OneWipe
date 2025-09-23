@@ -12,6 +12,7 @@ const { ethers } = require("ethers");
 
 const signing = require("./signing");
 const { logAction } = require("./audit");
+const { createAuditTrail, validateCertificateData, addSecurityMetadata, checkRateLimit } = require("./geolocation");
 
 const app = express();
 app.use(cors());
@@ -60,29 +61,94 @@ const startTime = Date.now();
 
 /* ---------------- SIGN & ANCHOR ---------------- */
 app.post("/signAndAnchor", async (req, res) => {
+  // Declare variables at function scope for error handling
+  let certID, certJSON, signatureBase64, certHashHex;
+  
   try {
-    const { certID, certJSON } = req.body;
+    // Rate limiting check
+    const clientIP = req.get('X-Forwarded-For') || req.connection.remoteAddress || 'unknown';
+    const rateCheck = checkRateLimit(clientIP, 5, 60000); // 5 requests per minute
+    
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ 
+        success: false, 
+        error: "Rate limit exceeded",
+        details: `Too many requests. Try again at ${rateCheck.resetTime}`,
+        remaining: rateCheck.remaining
+      });
+    }
+    
+    ({ certID, certJSON } = req.body);
     if (!certID || !certJSON) {
       return res.status(400).json({ success: false, error: "certID and certJSON required" });
     }
+    
+    // Validate certificate data integrity
+    validateCertificateData(certJSON);
+    
+    // Create comprehensive audit trail
+    const auditTrail = await createAuditTrail(req);
+    
+    // Add security metadata and audit trail
+    const enhancedCertJSON = addSecurityMetadata(certJSON, auditTrail);
 
     const canonicalString = JSON.stringify(
-      Object.keys(certJSON).sort().reduce((o, k) => {
-        o[k] = certJSON[k];
+      Object.keys(enhancedCertJSON).sort().reduce((o, k) => {
+        o[k] = enhancedCertJSON[k];
         return o;
       }, {})
     );
 
-    const signatureBase64 = signing.signString(canonicalString);
+    signatureBase64 = signing.signString(canonicalString);
     const signedBlob = canonicalString + "||" + signatureBase64;
-    const certHashHex = signing.sha256Hex(signedBlob);
+    certHashHex = signing.sha256Hex(signedBlob);
     const registry = await getRegistry();
 
-// ⛽ force gasLimit + log tx hash
-    const tx = await registry.storeCertificate(certID, certHashHex, { gasLimit: 500000 });
+// ⛽ Better gas settings for faster confirmation
+    const gasPrice = await registry.provider.getGasPrice();
+    const boostedGasPrice = gasPrice.mul(150).div(100); // 50% higher gas price
+    
+    const tx = await registry.storeCertificate(certID, certHashHex, { 
+      gasLimit: 300000,
+      gasPrice: boostedGasPrice
+    });
     console.log("📤 TX submitted:", tx.hash);
+    console.log("⛽ Gas price:", ethers.utils.formatUnits(boostedGasPrice, 'gwei'), "gwei");
 
-    const receipt = await tx.wait();
+    // Wait for confirmation with 30 second timeout
+    let receipt;
+    try {
+      receipt = await Promise.race([
+        tx.wait(),
+        new Promise((_, reject) => 
+          setTimeout(() => {
+            const timeoutError = new Error('Transaction confirmation timeout after 30 seconds');
+            timeoutError.txHash = tx.hash; // Preserve the transaction hash
+            reject(timeoutError);
+          }, 30000)
+        )
+      ]);
+    } catch (timeoutErr) {
+      if (timeoutErr.message.includes('timeout')) {
+        // Transaction was submitted but timed out - still log it
+        console.log("⏰ Transaction timed out but was submitted:", tx.hash);
+        console.log("🔗 Check status at:", `https://amoy.polygonscan.com/tx/${tx.hash}`);
+        
+        // Store partial info for later verification
+        txLog[certID] = {
+          txHash: tx.hash,
+          certHash: certHashHex,
+          signatureBase64,
+          certJSON: enhancedCertJSON,
+          submissionTime: new Date().toISOString(),
+          status: 'pending'
+        };
+        fs.writeFileSync(TXS_JSON_PATH, JSON.stringify(txLog, null, 2));
+        
+        throw timeoutErr; // Re-throw to be caught by outer catch
+      }
+      throw timeoutErr;
+    }
     console.log("✅ TX mined in block:", receipt.blockNumber, "hash:", receipt.transactionHash);
 
 
@@ -90,7 +156,9 @@ app.post("/signAndAnchor", async (req, res) => {
       txHash: receipt.transactionHash,
       certHash: certHashHex,
       signatureBase64,
-      certJSON,
+      certJSON: enhancedCertJSON,
+      submissionTime: new Date().toISOString(),
+      status: 'confirmed'
     };
     fs.writeFileSync(TXS_JSON_PATH, JSON.stringify(txLog, null, 2));
 
@@ -108,6 +176,24 @@ app.post("/signAndAnchor", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ signAndAnchor error:", err);
+    
+    // Handle timeout specifically
+    if (err.message.includes('timeout')) {
+      return res.status(202).json({ 
+        success: false, 
+        error: 'Transaction submitted but confirmation timed out',
+        details: 'The transaction was sent to the blockchain but confirmation is taking longer than expected. Check the transaction hash on Polygonscan.',
+        data: {
+          certID,
+          certHashHex,
+          signatureBase64,
+          txHash: err.txHash,
+          polygonscan: `https://amoy.polygonscan.com/tx/${err.txHash}`,
+          status: 'pending'
+        }
+      });
+    }
+    
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -115,6 +201,19 @@ app.post("/signAndAnchor", async (req, res) => {
 /* ---------------- VERIFY FULL ---------------- */
 app.post("/verifyFull", async (req, res) => {
   try {
+    // Rate limiting check
+    const clientIP = req.get('X-Forwarded-For') || req.connection.remoteAddress || 'unknown';
+    const rateCheck = checkRateLimit(clientIP, 20, 60000); // 20 requests per minute for verification
+    
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ 
+        success: false, 
+        error: "Rate limit exceeded",
+        details: `Too many requests. Try again at ${rateCheck.resetTime}`,
+        remaining: rateCheck.remaining
+      });
+    }
+    
     const { certID, certJSON, signatureBase64 } = req.body;
     if (!certID || !certJSON || !signatureBase64) {
       return res.status(400).json({ success: false, error: "certID, certJSON, and signatureBase64 required" });
@@ -383,6 +482,194 @@ app.get("/stats", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ stats error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ---------------- CHECK TX STATUS ---------------- */
+app.get("/txStatus/:id", async (req, res) => {
+  try {
+    const certID = req.params.id;
+    if (!certID || !txLog[certID]) {
+      return res.status(404).json({ success: false, error: "Certificate not found" });
+    }
+
+    const txHash = txLog[certID].txHash;
+    if (!txHash) {
+      return res.status(404).json({ success: false, error: "No transaction hash found" });
+    }
+
+    const provider = new ethers.providers.JsonRpcProvider(process.env.AMOY_RPC_URL);
+    
+    try {
+      const receipt = await provider.getTransactionReceipt(txHash);
+      
+      if (receipt) {
+        // Transaction confirmed!
+        if (txLog[certID].status === 'pending') {
+          txLog[certID].status = 'confirmed';
+          txLog[certID].blockNumber = receipt.blockNumber;
+          txLog[certID].confirmationTime = new Date().toISOString();
+          fs.writeFileSync(TXS_JSON_PATH, JSON.stringify(txLog, null, 2));
+        }
+        
+        // Get current block for confirmation count
+        const currentBlock = await provider.getBlockNumber();
+        const confirmations = currentBlock - receipt.blockNumber;
+        
+        return res.json({
+          success: true,
+          data: {
+            certID,
+            txHash,
+            status: 'confirmed',
+            blockNumber: receipt.blockNumber,
+            confirmations,
+            gasUsed: receipt.gasUsed.toString(),
+            effectiveGasPrice: receipt.effectiveGasPrice ? receipt.effectiveGasPrice.toString() : null,
+            transactionFee: receipt.effectiveGasPrice ? ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice)) : null,
+            confirmationTime: txLog[certID].confirmationTime,
+            polygonscan: `https://amoy.polygonscan.com/tx/${txHash}`,
+            blockExplorer: `https://amoy.polygonscan.com/block/${receipt.blockNumber}`
+          }
+        });
+      } else {
+        // Check if transaction exists but is pending
+        try {
+          const tx = await provider.getTransaction(txHash);
+          if (tx) {
+            return res.json({
+              success: true,
+              data: {
+                certID,
+                txHash,
+                status: 'pending',
+                gasPrice: tx.gasPrice.toString(),
+                gasLimit: tx.gasLimit.toString(),
+                nonce: tx.nonce,
+                submissionTime: txLog[certID].submissionTime || 'unknown',
+                polygonscan: `https://amoy.polygonscan.com/tx/${txHash}`
+              }
+            });
+          } else {
+            return res.json({
+              success: false,
+              data: {
+                certID,
+                txHash,
+                status: 'not_found',
+                error: 'Transaction not found on network',
+                polygonscan: `https://amoy.polygonscan.com/tx/${txHash}`
+              }
+            });
+          }
+        } catch (txErr) {
+          return res.json({
+            success: true,
+            data: {
+              certID,
+              txHash,
+              status: 'pending',
+              note: 'Transaction submitted, status check failed',
+              polygonscan: `https://amoy.polygonscan.com/tx/${txHash}`
+            }
+          });
+        }
+      }
+    } catch (err) {
+      return res.json({
+        success: true,
+        data: {
+          certID,
+          txHash,
+          status: 'unknown',
+          error: err.message,
+          polygonscan: `https://amoy.polygonscan.com/tx/${txHash}`
+        }
+      });
+    }
+  } catch (err) {
+    console.error("❌ txStatus error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ---------------- BATCH VERIFY ---------------- */
+app.post("/batchVerify", async (req, res) => {
+  try {
+    const { certificates } = req.body;
+    if (!certificates || !Array.isArray(certificates)) {
+      return res.status(400).json({ success: false, error: "certificates array required" });
+    }
+    
+    if (certificates.length > 10) {
+      return res.status(400).json({ success: false, error: "Maximum 10 certificates per batch" });
+    }
+    
+    const registry = await getRegistry();
+    const results = [];
+    
+    for (const cert of certificates) {
+      const { certID, certJSON, signatureBase64 } = cert;
+      
+      try {
+        if (!certID || !certJSON || !signatureBase64) {
+          results.push({
+            certID: certID || 'unknown',
+            success: false,
+            error: 'Missing required fields'
+          });
+          continue;
+        }
+        
+        // Verify signature
+        const canonicalString = JSON.stringify(
+          Object.keys(certJSON).sort().reduce((o, k) => {
+            o[k] = certJSON[k];
+            return o;
+          }, {})
+        );
+        
+        const sigOk = signing.verifySignature(canonicalString, signatureBase64);
+        const signedBlob = canonicalString + "||" + signatureBase64;
+        const certHashHex = signing.sha256Hex(signedBlob);
+        const anchored = await registry.verifyCertificate(certID, certHashHex);
+        
+        results.push({
+          certID,
+          success: true,
+          validSignature: sigOk,
+          anchored,
+          certHash: certHashHex
+        });
+        
+      } catch (err) {
+        results.push({
+          certID: certID || 'unknown',
+          success: false,
+          error: err.message
+        });
+      }
+    }
+    
+    const summary = {
+      total: certificates.length,
+      verified: results.filter(r => r.success && r.validSignature && r.anchored).length,
+      failed: results.filter(r => !r.success).length,
+      invalidSignature: results.filter(r => r.success && !r.validSignature).length,
+      notAnchored: results.filter(r => r.success && r.validSignature && !r.anchored).length
+    };
+    
+    logAction("batchVerify", `processed=${certificates.length} verified=${summary.verified}`);
+    
+    res.json({
+      success: true,
+      summary,
+      results
+    });
+    
+  } catch (err) {
+    console.error("❌ batchVerify error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

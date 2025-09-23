@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../widgets/top_nav_bar.dart';
-import '../widgets/responsive_layout.dart';
 
 class CertificateScreen extends StatelessWidget {
   const CertificateScreen({super.key});

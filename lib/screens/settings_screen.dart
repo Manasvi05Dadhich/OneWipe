@@ -20,7 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: const TopNavBar(currentRoute: '/settings'),
       body: ResponsiveLayout(
         mobile: _buildMobileLayout(theme),
@@ -81,7 +81,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               )),
           const SizedBox(height: 24),
-
           GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -202,15 +201,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 20),
           SwitchListTile(
             value: autoVerify,
-            activeColor: Colors.blue,
+            activeThumbColor: Colors.blue,
             onChanged: (v) => setState(() => autoVerify = v),
             title: const Text("Automatic Verification"),
-            subtitle: const Text(
-                "Verify data destruction after wipe completion"),
+            subtitle:
+                const Text("Verify data destruction after wipe completion"),
           ),
           SwitchListTile(
             value: generateCertificate,
-            activeColor: Colors.blue,
+            activeThumbColor: Colors.blue,
             onChanged: (v) => setState(() => generateCertificate = v),
             title: const Text("Generate Certificate"),
             subtitle: const Text("Create digital certificate upon completion"),
@@ -265,14 +264,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text("Algorithm: $selectedAlgorithm"),
           Text("Mode: ${isOnline ? "Online" : "Offline"}"),
           Text("Auto Verify: ${autoVerify ? "Enabled" : "Disabled"}"),
-          Text("Certificates: ${generateCertificate ? "Generate" : "Disabled"}"),
+          Text(
+              "Certificates: ${generateCertificate ? "Generate" : "Disabled"}"),
         ],
       ),
     );
   }
 
   // ---------------- HELPERS ----------------
-  Widget _algoTile(ThemeData theme, String title, String subtitle, bool selected,
+  Widget _algoTile(
+      ThemeData theme, String title, String subtitle, bool selected,
       {bool recommended = false}) {
     return InkWell(
       onTap: () => setState(() => selectedAlgorithm = title),
@@ -329,4 +330,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
