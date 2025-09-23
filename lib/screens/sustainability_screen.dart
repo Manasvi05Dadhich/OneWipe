@@ -50,44 +50,19 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
         _globalStats = globalResponse['data'];
       }
 
-      // Load leaderboard (mock for now)
-      _leaderboard = [
-        {
-          'orgName': 'EcoTech Solutions',
-          'co2Saved': 15000,
-          'devicesWiped': 75,
-          'rank': 1,
-          'greenTokens': 75
-        },
-        {
-          'orgName': 'Green IT Corp',
-          'co2Saved': 12000,
-          'devicesWiped': 60,
-          'rank': 2,
-          'greenTokens': 60
-        },
-        {
-          'orgName': 'Sustainable Systems',
-          'co2Saved': 8500,
-          'devicesWiped': 42,
-          'rank': 3,
-          'greenTokens': 42
-        },
-        {
-          'orgName': 'CleanTech Innovations',
-          'co2Saved': 6200,
-          'devicesWiped': 31,
-          'rank': 4,
-          'greenTokens': 31
-        },
-        {
-          'orgName': 'Circular Computing',
-          'co2Saved': 4800,
-          'devicesWiped': 24,
-          'rank': 5,
-          'greenTokens': 24
-        },
-      ];
+      // Load leaderboard from API
+      try {
+        final leaderboardResponse = await _api.getSustainabilityLeaderboard();
+        if (leaderboardResponse['success']) {
+          _leaderboard = List<Map<String, dynamic>>.from(
+            leaderboardResponse['leaderboard'] ?? []
+          );
+        }
+      } catch (e) {
+        // Leaderboard service not available, use empty list
+        print('Leaderboard not available: $e');
+        _leaderboard = [];
+      }
 
       setState(() {
         _isLoading = false;
@@ -287,7 +262,7 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
                 child: _buildStatCard(
                   theme: theme,
                   title: 'Total CO₂ Saved',
-                  value: _formatCO2(_globalStats?['totalCO2Saved'] ?? 46200),
+                  value: _formatCO2(_globalStats?['totalCO2Saved'] ?? 0),
                   subtitle: 'Tons of CO₂',
                   icon: Icons.cloud_off,
                   color: Colors.green,
@@ -298,7 +273,7 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
                 child: _buildStatCard(
                   theme: theme,
                   title: 'Devices Recycled',
-                  value: (_globalStats?['totalDevicesWiped'] ?? 231).toString(),
+                  value: (_globalStats?['totalDevicesWiped'] ?? 0).toString(),
                   subtitle: 'Total devices',
                   icon: Icons.devices,
                   color: Colors.blue,
@@ -313,7 +288,7 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
                 child: _buildStatCard(
                   theme: theme,
                   title: 'Active Organizations',
-                  value: '12',
+                  value: (_globalStats?['activeOrganizations'] ?? 0).toString(),
                   subtitle: 'Participating orgs',
                   icon: Icons.business,
                   color: Colors.purple,
@@ -324,7 +299,7 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
                 child: _buildStatCard(
                   theme: theme,
                   title: 'Green Tokens',
-                  value: '231',
+                  value: (_globalStats?['totalDevicesWiped'] ?? 0).toString(),
                   subtitle: 'NFTs minted',
                   icon: Icons.eco,
                   color: Colors.orange,
@@ -378,21 +353,54 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
           ),
           const SizedBox(height: 16),
           
-          // Top 3 Podium
-          _buildPodium(theme),
-          
-          const SizedBox(height: 24),
-          
-          // Full Leaderboard
-          Card(
-            child: Column(
-              children: _leaderboard.asMap().entries.map((entry) {
-                final index = entry.key;
-                final org = entry.value;
-                return _buildLeaderboardItem(theme, org, index + 1);
-              }).toList(),
+          if (_leaderboard.isEmpty) ..[
+            // Empty state
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.eco_outlined,
+                      size: 64,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No Organizations Yet',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Complete your first secure wipe to start the leaderboard!',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ] else ..[
+            // Top 3 Podium
+            _buildPodium(theme),
+            
+            const SizedBox(height: 24),
+            
+            // Full Leaderboard
+            Card(
+              child: Column(
+                children: _leaderboard.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final org = entry.value;
+                  return _buildLeaderboardItem(theme, org, index + 1);
+                }).toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -557,7 +565,7 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
   }
 
   Widget _buildImpactComparison(ThemeData theme) {
-    final co2Saved = _globalStats?['totalCO2Saved'] ?? 46200;
+    final co2Saved = _globalStats?['totalCO2Saved'] ?? 0;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -618,7 +626,18 @@ class _SustainabilityScreenState extends State<SustainabilityScreen>
   }
 
   Widget _buildPodium(ThemeData theme) {
-    if (_leaderboard.length < 3) return Container();
+    if (_leaderboard.length < 3) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        child: Text(
+          'Leaderboard will appear when 3+ organizations participate',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
