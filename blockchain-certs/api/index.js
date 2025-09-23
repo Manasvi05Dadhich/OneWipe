@@ -13,6 +13,7 @@ const { ethers } = require("ethers");
 const signing = require("./signing");
 const { logAction } = require("./audit");
 const { createAuditTrail, validateCertificateData, addSecurityMetadata, checkRateLimit } = require("./geolocation");
+const { GreenTokenService } = require("./greenToken");
 
 const app = express();
 app.use(cors());
@@ -58,6 +59,36 @@ async function getRegistry() {
 
 // Track uptime
 const startTime = Date.now();
+
+// Initialize Green Token service (will be setup after deployment)
+let greenTokenService = null;
+
+// Initialize Green Token service if contract is deployed
+function initGreenTokenService() {
+  try {
+    // This would use a separate Green Token contract address
+    // For now, we'll use a placeholder until deployed
+    const greenTokenAddress = process.env.GREEN_TOKEN_CONTRACT_ADDRESS;
+    if (greenTokenAddress) {
+      const provider = new ethers.providers.JsonRpcProvider(process.env.AMOY_RPC_URL);
+      // Green token ABI would be loaded separately
+      greenTokenService = new GreenTokenService(
+        provider, 
+        greenTokenAddress, 
+        [], // Green token ABI
+        process.env.PRIVATE_KEY
+      );
+      console.log('🌱 Green Token service initialized');
+    } else {
+      console.log('🌱 Green Token contract not configured - sustainability features disabled');
+    }
+  } catch (err) {
+    console.error('❌ Failed to initialize Green Token service:', err.message);
+  }
+}
+
+// Initialize on startup
+initGreenTokenService();
 
 /* ---------------- SIGN & ANCHOR ---------------- */
 app.post("/signAndAnchor", async (req, res) => {
@@ -670,6 +701,178 @@ app.post("/batchVerify", async (req, res) => {
     
   } catch (err) {
     console.error("❌ batchVerify error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ---------------- GREEN TOKEN ENDPOINTS ---------------- */
+
+// Mint Green Token (called automatically after successful cert)
+app.post("/mintGreenToken", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available",
+        details: "GREEN_TOKEN_CONTRACT_ADDRESS not configured"
+      });
+    }
+    
+    const { certData, wipeData, recipientAddress, orgName } = req.body;
+    
+    if (!certData || !wipeData || !recipientAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "certData, wipeData, and recipientAddress required" 
+      });
+    }
+    
+    const result = await greenTokenService.mintGreenToken(
+      certData, wipeData, recipientAddress, orgName
+    );
+    
+    logAction("mintGreenToken", `tokenId=${result.tokenId} device=${result.deviceType} co2=${result.co2SavedKg}kg`);
+    
+    res.json({ success: true, data: result });
+    
+  } catch (err) {
+    console.error("❌ mintGreenToken error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get organization sustainability stats
+app.get("/sustainability/org/:address", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available" 
+      });
+    }
+    
+    const { address } = req.params;
+    const stats = await greenTokenService.getOrganizationStats(address);
+    
+    res.json({ success: true, data: stats });
+    
+  } catch (err) {
+    console.error("❌ org sustainability stats error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get global sustainability stats
+app.get("/sustainability/global", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available" 
+      });
+    }
+    
+    const stats = await greenTokenService.getGlobalStats();
+    
+    res.json({ success: true, data: stats });
+    
+  } catch (err) {
+    console.error("❌ global sustainability stats error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get Green Token metadata
+app.get("/green-token/:tokenId", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available" 
+      });
+    }
+    
+    const { tokenId } = req.params;
+    const metadata = await greenTokenService.getTokenMetadata(tokenId);
+    
+    res.json({ success: true, data: metadata });
+    
+  } catch (err) {
+    console.error("❌ green token metadata error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get Green Token NFT metadata (for OpenSea)
+app.get("/green-token/:tokenId.json", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(404).json({ error: "Token not found" });
+    }
+    
+    const { tokenId } = req.params;
+    const metadata = await greenTokenService.getTokenMetadata(tokenId);
+    const nftMetadata = greenTokenService.generateNFTMetadata({
+      ...metadata,
+      tokenId: tokenId
+    });
+    
+    res.json(nftMetadata);
+    
+  } catch (err) {
+    console.error("❌ green token NFT metadata error:", err);
+    res.status(404).json({ error: "Token not found" });
+  }
+});
+
+// Get sustainability leaderboard
+app.get("/sustainability/leaderboard", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available" 
+      });
+    }
+    
+    const { limit = 10 } = req.query;
+    const leaderboard = await greenTokenService.getLeaderboard(parseInt(limit));
+    
+    res.json(leaderboard);
+    
+  } catch (err) {
+    console.error("❌ sustainability leaderboard error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Register organization for Green Tokens
+app.post("/sustainability/register-org", async (req, res) => {
+  try {
+    if (!greenTokenService) {
+      return res.status(503).json({ 
+        success: false, 
+        error: "Green Token service not available" 
+      });
+    }
+    
+    const { orgAddress, orgName } = req.body;
+    
+    if (!orgAddress || !orgName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "orgAddress and orgName required" 
+      });
+    }
+    
+    const result = await greenTokenService.registerOrganization(orgAddress, orgName);
+    
+    logAction("registerOrg", `address=${orgAddress} name=${orgName}`);
+    
+    res.json({ success: true, data: result });
+    
+  } catch (err) {
+    console.error("❌ register organization error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

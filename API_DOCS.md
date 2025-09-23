@@ -681,4 +681,212 @@ curl http://localhost:3000/api/blockchain/stats
 
 ---
 
-This documentation provides everything your frontend team needs to integrate with the OneWipe API!
+---
+
+## 🌱 **Green Token (Sustainability) Endpoints**
+
+### **Mint Green Token (Auto-called after wipe)**
+```http
+POST /api/blockchain/mintGreenToken
+```
+
+**Request Body:**
+```json
+{
+  "certData": {
+    "certID": "wipe-1758642326590-abc123",
+    "certHashHex": "1bfc0d03..."
+  },
+  "wipeData": {
+    "targetPath": "C:\\path\\to\\device",
+    "deviceName": "Samsung SSD 970 EVO",
+    "policy": "clear"
+  },
+  "recipientAddress": "0x742d35Cc6634C0532925a3b8D4842a9c0f6aEa40",
+  "orgName": "EcoTech Solutions"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "tokenId": "42",
+    "deviceType": "laptop",
+    "co2SavedKg": 200,
+    "txHash": "0xdef456...",
+    "opensea": "https://testnets.opensea.io/assets/amoy/0x.../42"
+  }
+}
+```
+
+### **Get Global Sustainability Stats**
+```http
+GET /api/blockchain/sustainability/global
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalCO2Saved": 46200,
+    "totalDevicesWiped": 231
+  }
+}
+```
+
+### **Get Organization Sustainability Stats**
+```http
+GET /api/blockchain/sustainability/org/{address}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "orgName": "EcoTech Solutions",
+    "totalCO2Saved": 15000,
+    "devicesWiped": 75
+  }
+}
+```
+
+### **Get Sustainability Leaderboard**
+```http
+GET /api/blockchain/sustainability/leaderboard?limit=10
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "leaderboard": [
+    {
+      "orgName": "EcoTech Solutions",
+      "co2Saved": 15000,
+      "devicesWiped": 75,
+      "rank": 1
+    }
+  ]
+}
+```
+
+### **Get Green Token Metadata**
+```http
+GET /api/blockchain/green-token/{tokenId}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "deviceType": "laptop",
+    "certHash": "1bfc0d03...",
+    "co2SavedKg": 200,
+    "issuedTo": "EcoTech Solutions",
+    "timestamp": 1758642157,
+    "timestampReadable": "2025-09-23T15:42:37.000Z"
+  }
+}
+```
+
+### **Get NFT Metadata (OpenSea compatible)**
+```http
+GET /api/blockchain/green-token/{tokenId}.json
+```
+
+**Response:**
+```json
+{
+  "name": "Green Wipe Credit #42",
+  "description": "This NFT represents the environmental impact of securely wiping and recycling a laptop. By choosing to reuse instead of discard, EcoTech Solutions prevented 200 kg (0.20 tons) of CO₂ from entering the atmosphere.",
+  "image": "https://api.onewipe.app/green-token/images/laptop.png",
+  "attributes": [
+    {
+      "trait_type": "Device Type",
+      "value": "Laptop"
+    },
+    {
+      "trait_type": "CO₂ Saved (kg)",
+      "value": 200,
+      "display_type": "number"
+    },
+    {
+      "trait_type": "Organization",
+      "value": "EcoTech Solutions"
+    }
+  ]
+}
+```
+
+### **Register Organization**
+```http
+POST /api/blockchain/sustainability/register-org
+```
+
+**Request Body:**
+```json
+{
+  "orgAddress": "0x742d35Cc6634C0532925a3b8D4842a9c0f6aEa40",
+  "orgName": "EcoTech Solutions"
+}
+```
+
+---
+
+## 🌍 **Green Token Integration Flow**
+
+### **Automatic Green Token Minting**
+```javascript
+// After successful wipe + certificate, automatically mint Green Token
+const mintGreenToken = async (wipeResult) => {
+  const { wipeId, certificate, wipeData } = wipeResult;
+  
+  const greenTokenResult = await fetch('/api/blockchain/mintGreenToken', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      certData: certificate.data,
+      wipeData: wipeData,
+      recipientAddress: '0x742d35Cc6634C0532925a3b8D4842a9c0f6aEa40',
+      orgName: 'Your Organization Name'
+    })
+  });
+  
+  const greenToken = await greenTokenResult.json();
+  
+  if (greenToken.success) {
+    console.log(`🌱 Green Token minted! Token ID: ${greenToken.data.tokenId}`);
+    console.log(`🌍 CO₂ impact: ${greenToken.data.co2SavedKg} kg saved`);
+    console.log(`🎨 View NFT: ${greenToken.data.opensea}`);
+  }
+  
+  return greenToken;
+};
+```
+
+### **Sustainability Dashboard Data**
+```javascript
+// Load sustainability dashboard data
+const loadSustainabilityData = async () => {
+  const [global, org, leaderboard] = await Promise.all([
+    fetch('/api/blockchain/sustainability/global'),
+    fetch('/api/blockchain/sustainability/org/0x742d35Cc...'),
+    fetch('/api/blockchain/sustainability/leaderboard?limit=10')
+  ]);
+  
+  return {
+    global: await global.json(),
+    organization: await org.json(),
+    leaderboard: await leaderboard.json()
+  };
+};
+```
+
+---
+
+This documentation provides everything your frontend team needs to integrate with the OneWipe API including the new Green Token sustainability features!

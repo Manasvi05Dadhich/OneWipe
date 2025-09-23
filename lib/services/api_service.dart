@@ -172,6 +172,86 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  // =================== SUSTAINABILITY / GREEN TOKEN OPERATIONS ===================
+
+  /// Get global sustainability statistics
+  Future<Map<String, dynamic>> getSustainabilityStats() async {
+    final response = await http.get(
+      Uri.parse('$_blockchainUrl/sustainability/global'),
+      headers: _headers,
+    );
+    
+    return _handleResponse(response);
+  }
+
+  /// Get organization sustainability stats
+  Future<Map<String, dynamic>> getOrgSustainabilityStats(String orgAddress) async {
+    final response = await http.get(
+      Uri.parse('$_blockchainUrl/sustainability/org/$orgAddress'),
+      headers: _headers,
+    );
+    
+    return _handleResponse(response);
+  }
+
+  /// Get sustainability leaderboard
+  Future<Map<String, dynamic>> getSustainabilityLeaderboard({int limit = 10}) async {
+    final response = await http.get(
+      Uri.parse('$_blockchainUrl/sustainability/leaderboard?limit=$limit'),
+      headers: _headers,
+    );
+    
+    return _handleResponse(response);
+  }
+
+  /// Register organization for Green Tokens
+  Future<Map<String, dynamic>> registerOrganization({
+    required String orgAddress,
+    required String orgName,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_blockchainUrl/sustainability/register-org'),
+      headers: _headers,
+      body: jsonEncode({
+        'orgAddress': orgAddress,
+        'orgName': orgName,
+      }),
+    );
+    
+    return _handleResponse(response);
+  }
+
+  /// Mint Green Token (usually called automatically after wipe)
+  Future<Map<String, dynamic>> mintGreenToken({
+    required Map<String, dynamic> certData,
+    required Map<String, dynamic> wipeData,
+    required String recipientAddress,
+    String? orgName,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_blockchainUrl/mintGreenToken'),
+      headers: _headers,
+      body: jsonEncode({
+        'certData': certData,
+        'wipeData': wipeData,
+        'recipientAddress': recipientAddress,
+        'orgName': orgName,
+      }),
+    );
+    
+    return _handleResponse(response);
+  }
+
+  /// Get Green Token metadata
+  Future<Map<String, dynamic>> getGreenToken(String tokenId) async {
+    final response = await http.get(
+      Uri.parse('$_blockchainUrl/green-token/$tokenId'),
+      headers: _headers,
+    );
+    
+    return _handleResponse(response);
+  }
+
   // =================== DOCUMENT GENERATION ===================
   
   /// Get QR code for certificate
