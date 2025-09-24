@@ -67,5 +67,77 @@
       "note": "Generated from PowerShell demo"
     },
     "status": "pending"
+  },
+  "aayush-test-20250924-112940": {
+    "txHash": "0x60c6748439546cc1f9c25da23f4534fb074381008d03e6a80419e6c484a22391",
+    "certHash": "096fc83cc296b1b089a775fd4009505a6f15a8bc72ac58463d447f4b23609094",
+    "signatureBase64": "NlbXrGsffUil99BuKqD211o3W0BdSDHCbEAqOB0xbOl/Upl7pp3OxehE15DPAGWgX3hlOLHorLYzTqZEClPJoKzXfAQvizYV2Xx/jW7TgWXqaCV43eMNlqnQ+35SZm645M12mkUW9N0X4doffo8tlb/eeXZrQ/sewqjy+TK6ND7xDENQkP1MzFxXgoafQ2EvC5oBsi0dF41MM7boGA0P7FJUacwpmtPQ9g6qstzgTyuyxkn6mz+Zbrzkpf4NLijsjigLnjGzizu1lWuqiuM3X8XWWGkl4b4SW52O0y/AcxNWGlHvu5f/g+NHF0jv7YsKBzhB3eg+UQrWXxJlq+aDQw==",
+    "certJSON": {
+      "policy": "NIST-Clear",
+      "timestamp": "2025-09-24T11:29:40Z",
+      "wipedBy": "OneWipe-System",
+      "device": "Test Laptop for Aayush Portal",
+      "security": {
+        "issuer": "OneWipe Secure Certificate Authority",
+        "version": "1.0",
+        "standard": "OneWipe-2025",
+        "auditTrail": {
+          "timestamp": "2025-09-24T06:00:12.546Z",
+          "sessionId": "a13f2b399aeeba8dd8072edbf317eaaa",
+          "geolocation": {
+            "ip": "::1",
+            "country": "Unknown",
+            "countryCode": "UN",
+            "region": "Unknown",
+            "regionCode": "UN",
+            "city": "Unknown",
+            "timezone": "Asia/Calcutta",
+            "isp": "Unknown ISP",
+            "org": "Unknown Organization",
+            "latitude": 0,
+            "longitude": 0
+          },
+          "system": {
+            "hostname": "TANU",
+            "platform": "win32",
+            "arch": "x64",
+            "nodeVersion": "v22.16.0",
+            "uptime": 87,
+            "memory": {
+              "used": 70,
+              "heap": 25
+            }
+          },
+          "network": {
+            "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.6584",
+            "acceptLanguage": "unknown",
+            "origin": "unknown",
+            "referer": "unknown",
+            "forwarded": "::1"
+          },
+          "security": {
+            "tlsVersion": null,
+            "cipher": null,
+            "authorized": false
+          },
+          "integrity": {
+            "auditHash": "65acdfc98c2df89b9b96b0470768e1a2b0ef050a20aed6d2d50679e438645c3b"
+          }
+        },
+        "compliance": {
+          "gdpr": true,
+          "ccpa": true,
+          "iso27001": true,
+          "nist": true
+        },
+        "encryption": {
+          "algorithm": "RSA-2048",
+          "hashFunction": "SHA-256",
+          "signatureStandard": "PKCS#1 v1.5"
+        }
+      }
+    },
+    "submissionTime": "2025-09-24T06:01:04.663Z",
+    "status": "pending"
   }
 }
