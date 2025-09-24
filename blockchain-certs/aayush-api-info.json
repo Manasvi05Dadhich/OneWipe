@@ -1,0 +1,102 @@
+{
+  "baseURL": "http://localhost:4000",
+  "description": "OneWipe Blockchain Certificate Verification APIs",
+  "version": "1.0",
+  
+  "endpoints": {
+    "health": {
+      "method": "GET",
+      "path": "/health",
+      "description": "Check if blockchain service is running and accessible"
+    },
+    "verifyFull": {
+      "method": "POST", 
+      "path": "/verifyFull",
+      "description": "Verify certificate signature and blockchain anchoring",
+      "bodyExample": {
+        "certID": "test-cert-001",
+        "certJSON": {
+          "device": "Test Laptop",
+          "wipedBy": "OneWipe-System",
+          "timestamp": "2025-01-24T06:00:00Z",
+          "policy": "NIST-Clear"
+        },
+        "signatureBase64": "VkbAme1JSVOR9iuNvqxmZZCNMMM4C..."
+      }
+    },
+    "getCert": {
+      "method": "GET",
+      "path": "/getCert/{certID}",
+      "description": "Get certificate details from blockchain"
+    },
+    "txStatus": {
+      "method": "GET", 
+      "path": "/txStatus/{certID}",
+      "description": "Check blockchain transaction status for certificate"
+    },
+    "batchVerify": {
+      "method": "POST",
+      "path": "/batchVerify", 
+      "description": "Verify multiple certificates at once (max 10)",
+      "bodyExample": {
+        "certificates": [
+          {
+            "certID": "cert-1",
+            "certJSON": {"device": "Device 1", "wipedBy": "OneWipe"},
+            "signatureBase64": "signature1..."
+          }
+        ]
+      }
+    }
+  },
+
+  "blockchain": {
+    "network": "Polygon Amoy Testnet",
+    "contractAddress": "0x8469CfC74478b2A26BfB944ADefCD18e27f5D0b7", 
+    "explorerUrl": "https://amoy.polygonscan.com",
+    "explorerAPI": "https://api-amoy.polygonscan.com/api"
+  },
+
+  "cors": {
+    "allowedOrigins": [
+      "http://localhost:3000",
+      "http://localhost:3001", 
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3001"
+    ],
+    "note": "Add your React app's URL here if different"
+  },
+
+  "sampleCertificates": {
+    "testCert1": {
+      "certID": "sample-cert-001",
+      "device": "Sample Laptop", 
+      "policy": "NIST-Clear",
+      "note": "Use test script to generate actual certificates"
+    }
+  },
+
+  "integrationSteps": [
+    "1. Ensure OneWipe blockchain service is running on localhost:4000",
+    "2. Test /health endpoint to verify connectivity", 
+    "3. Create sample certificates using /signAndAnchor",
+    "4. Test verification flow with /verifyFull",
+    "5. Build React components around these APIs"
+  ],
+
+  "commonResponses": {
+    "success": {
+      "success": true,
+      "data": "/* response data */"
+    },
+    "error": {
+      "success": false, 
+      "error": "Error message"
+    },
+    "rateLimited": {
+      "success": false,
+      "error": "Rate limit exceeded",
+      "details": "Too many requests. Try again at 2025-01-24T06:30:00Z"
+    }
+  }
+}
